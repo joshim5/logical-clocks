@@ -1,5 +1,5 @@
 # Lab Notebook
-This lab notebook tracks our progress, thoughts and reaction on the development of scale models. In particular, we are implementing these systems in order to better understand logical clocks. All observations are recorded here. Here, we consider Git to be our [corroborating witness](http://www.otc.umd.edu/inventors/lab-notebooks). We chose this Git approach, for it allows us to soft-delete observations, for clarity and organization. We can change the formatting of this document, but still maintain evidence of our initial train of thought. Furthermore, our commits serve as digital signatures and we can even cryptographically [sign our work](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work), if desired. 
+This lab notebook tracks our progress, thoughts and reaction on the development of scale models. In particular, we are implementing these systems in order to better understand logical clocks. All observations are recorded here. Here, we consider Git to be our [corroborating witness](http://www.otc.umd.edu/inventors/lab-notebooks). We chose this Git approach, for it allows us to soft-delete observations, for clarity and organization. We can change the formatting of this document, but still maintain evidence of our initial train of thought. Furthermore, our commits serve as digital signatures and we can even cryptographically [sign our work](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work), if desired.
 
 This is a living document.
 
@@ -7,7 +7,7 @@ This is a living document.
 
 ### Threading in Python
 
-As we are developing virtual machines with heavy reliance on communication protocols, we first sought a thorough understanding of threading in our desired programming language implementations. While coding in Python would increase the rate of development, as compared to lower-level languages, we quickly observed that threading in most Python implementations is a touchy subject. In particular, some implementations of Python use a [Global Interpreter Lock](https://wiki.python.org/moin/GlobalInterpreterLock), which  is a mutex that prevents multiple native threads from executing Python bytecodes at once. This lock is necessary mainly because Python's memory management is not thread-safe, in many implementations. 
+As we are developing virtual machines with heavy reliance on communication protocols, we first sought a thorough understanding of threading in our desired programming language implementations. While coding in Python would increase the rate of development, as compared to lower-level languages, we quickly observed that threading in most Python implementations is a touchy subject. In particular, some implementations of Python use a [Global Interpreter Lock](https://wiki.python.org/moin/GlobalInterpreterLock), which  is a mutex that prevents multiple native threads from executing Python bytecodes at once. This lock is necessary mainly because Python's memory management is not thread-safe, in many implementations.
 
 The GIL is controversial because it prevents multi-threaded Python programs from taking full advantage of multiprocessor systems in certain situations. While this approach can be faster in the single-threaded case, our study requires true asynchrony, in order for our virtual machines to best model real [distributed systems](http://www.webopedia.com/TERM/V/virtual_machine.html).
 
@@ -27,10 +27,21 @@ We will write a `VirtualMachine` class, that is initialized with some ticks para
 Another design strategy is to run each Python script as a separate machine, and have them communicate by some socket or local data file. Indeed, this might overcome the GIL issue. We might return to this idea and experiment with this after the initial development.
 
 ### Communication
-With the object-oriented paradigm, the easiest way to create asynchronous machines is to instantiate the objects separately, and have them communicate via shared lists in memory. Each list represents a virtual machine's message queue. A message queue handler (in our simple model, just a dictionary of lists, with some helper functions) will allow each virtual machine to access the message queues of other machines. Allowed operations: 
+With the object-oriented paradigm, the easiest way to create asynchronous machines is to instantiate the objects separately, and have them communicate via shared lists in memory. Each list represents a virtual machine's message queue. A message queue handler (in our simple model, just a dictionary of lists, with some helper functions) will allow each virtual machine to access the message queues of other machines. Allowed operations:
 
 * A machine can append messages to other machines' message queues.
 * A machine can pop messages from its own queue.
 
 We considered having this handler take control of the message sending infrastructure, but we decided that this should be maintained in the `VirtualMachine` class, since the virtual machines should decide which machines should get the messages.
+
+### Running Threads Synchronously
+After implementing the `VirtualMachine` class and starting the `Coordinator` file, we face a new issue. After initializing all the `VirtualMachine`s, how can we have each `run()` method be called at the same time?
+
+A great [stackoverflow answer](http://stackoverflow.com/questions/2108126/how-to-run-two-functions-simultaneously) referred us to the `multiprocessing` package, included with Python ≥ 2.7. The multiprocessing package offers both local and remote concurrency, effectively side-stepping the Global Interpreter Lock by using subprocesses instead of threads. Due to this, the multiprocessing module allows the programmer to fully leverage multiple processors on a given machine. It runs on both Unix and Windows.
+
+This seems to be working! We read the same Global System Time off the top of the logs when we call:
+```python
+message = "Started VM {0} at system time {1}\n\n".format(self.msgq_self_id, self.getSystemTime())
+    self.log(message)
+```
 
