@@ -12,7 +12,7 @@
 #include <pthread.h>
 #include <globalclock.h>
 
-static struct machine machines[THREADS];
+struct machine machines[THREADS];
 
 /* Initialize a machine with a certain number of ticks and an id. */
 int pre_init_machine(int ticks, int id) {
@@ -47,30 +47,6 @@ int pre_init_machine(int ticks, int id) {
 	return 0;
 }
 
-int init_machines(void) {
-	for (int i = 0; i < THREADS; i++) {
-		/* Start up server thread */
-		pthread_t server_id;
-		
-		int err = pthread_create(&server_id, NULL, server_routine, (void*) &machines[i]);
-		if (err) {
-			perror("pthread_create");
-			return -1;
-		}
-
-		/* Start up client thread */
-		pthread_t client_id;
-		
-		err = pthread_create(&client_id, NULL, client_routine, (void*) &machines[i]);
-		if (err) {
-			perror("pthread_create");
-			return -1;
-		}
-	}
-
-	return 0;
-}
-
 /* Client thread entrypoint. The argument must be a pointer to the 
  * corresponding machine struct. */
 void *client_routine(void *arg) {
@@ -100,7 +76,8 @@ void *client_routine(void *arg) {
 			/* This may not work, since the other machine may
 			 * not have started its server yet. In that case,
 			 * we simply loop and try again. */
-			err = connect(client->connections[counter], (struct sockaddr *) &servaddr, sizeof(servaddr));
+			err = connect(client->connections[counter], (struct sockaddr *) &servaddr, 
+					sizeof(servaddr));
 			
 			if (err != 0) { 
 				perror("connect");
@@ -255,7 +232,8 @@ void *server_routine(void *arg) {
 	fcntl(server->master_socket, F_SETFL, O_NONBLOCK);
 
 	int yes = 1;
-	setsockopt(server->master_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+	setsockopt(server->master_socket, SOL_SOCKET, SO_REUSEADDR, &yes, 
+		sizeof(int));
 
 	/* Set up server binding configuration */
 	struct sockaddr_in servaddr; 
@@ -266,7 +244,8 @@ void *server_routine(void *arg) {
 	inet_pton(AF_INET, "localhost", &servaddr.sin_addr);
 	
 	/* Bind server to port */
-	int err = bind(server->master_socket, (struct sockaddr *) &servaddr, sizeof(servaddr));
+	int err = bind(server->master_socket, (struct sockaddr *) &servaddr, 
+		sizeof(servaddr));
 	if (err) {
 		printf("Server: bind: error binding to port\n");
 		perror("bind");

@@ -1,7 +1,8 @@
 #include <sys/time.h>
 #include <time.h>
 
-int cmptime(struct timeval *start, struct timeval *end, struct timeval *remains) {
+int cmptime(struct timeval *start, struct timeval *end, 
+		struct timeval *remains) {
 	remains->tv_sec = end->tv_sec - start->tv_sec;
 	remains->tv_usec = end->tv_usec - start->tv_usec;
 

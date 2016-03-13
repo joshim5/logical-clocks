@@ -5,6 +5,7 @@
 
 #define THREADS 3
 #define BUF_SIZE 128
+#define CLOCKS_MAX 500
 
 struct server {
 	int master_socket;
@@ -29,7 +30,8 @@ struct machine {
 	struct client client;
 };
 
-int init_machines(void);
+extern struct machine machines[THREADS];
+
 int pre_init_machine(int ticks, int id);
 void *server_routine(void *arg);
 void *client_routine(void *arg);
