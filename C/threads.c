@@ -27,6 +27,8 @@ int pre_init_machine(int ticks, int id) {
 	sprintf(filename, "log/machine%d.log", id);
 	machines[id].log = fopen(filename, "w+");
 	
+	fprintf(machines[id].log, "Number of Ticks: %d\n\n", ticks);
+
 	if (machines[id].log == NULL) {
 		perror("open");
 	}

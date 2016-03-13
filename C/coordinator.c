@@ -12,8 +12,9 @@ pthread_t threads[THREADS_MAX];
 
 int main(int argc, char** argv) {
 	int err = 0;
-
-	srand(time(NULL));
+	
+	/* x is the global seed in <random.h> */
+	x = time(NULL);
 	
 	int ticks[THREADS];
 

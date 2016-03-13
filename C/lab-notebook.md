@@ -106,6 +106,11 @@ Implemented `random_int` in `<random.h>`. This is using `rand()` and I do not
 like it; it keeps repeating patterns. Later, implement Mersenne Twister
 or something. Sometimes I don't like C...
 
+**Sunday, March 14th, 4pm**
+
+Implemented xorshift instead of using `rand()`. Simple version of xorshift,
+but should work fine for our purposes.
+
 ### Time
 
 **Saturday, March 13th, 12:30pm**
@@ -188,10 +193,15 @@ Ah ha! Nevermind, I was using `fwrite`. Switching to `fprintf` made the code
 look better (no need for `snprintf` anymore) and made it work. But I still
 get way too many 0s in the beginning. Probably something on the queue.
 
-**Sunday, March 13th, 1am**
+**Sunday, March 14th, 1am**
 
 Decided to do the timing in the client. Had not implemented that yet. Simply
 added `cmptime` functionality in the client. Not much changed.
+
+**Sunday, March 14th, 4:45pm**
+
+Changed style in `write_to_log`. Added `usecs` and space between events.
+Easier to read now.
 
 ### General Things
 
