@@ -98,7 +98,7 @@ will need to be protected by a mutex.
 This section was written as we were coding and therefore may not be very
 organized, but it reflects what we were doing.
 
-## Random
+### Random
 
 **Saturday, March 13th, noon**
 
@@ -106,7 +106,7 @@ Implemented `random_int` in `<random.h>`. This is using `rand()` and I do not
 like it; it keeps repeating patterns. Later, implement Mersenne Twister
 or something. Sometimes I don't like C...
 
-## Time
+### Time
 
 **Saturday, March 13th, 12:30pm**
 
@@ -114,7 +114,7 @@ Implemented `cmptime`, a function that takes two `struct timeval` and computes
 the difference into a third one. Returns 1 if this difference is > 1 (in
 which case the third `timeval` is 0). Returns 0 if the differente is < 1.
 
-## Queue
+### Queue
 
 **Saturday, March 13th, 1pm**
 
@@ -126,7 +126,7 @@ Fixed the queue. I was adding to its rear before enqueuing. So there was always
 a 0 in the beginning (since I `memset` every element to 0). Switching some
 things around fixes it.
 
-## Server
+### Server
 
 **Saturday, March 13th, 2:15pm**
 
@@ -154,7 +154,7 @@ the select run again and fixes it.
 Found another bug. I was not appropriately handling errors on `read` in the
 server. Oops.
 
-## Client
+### Client
 
 **Saturday, March 13th, 2pm**
 
@@ -193,7 +193,7 @@ get way too many 0s in the beginning. Probably something on the queue.
 Decided to do the timing in the client. Had not implemented that yet. Simply
 added `cmptime` functionality in the client. Not much changed.
 
-## General Things
+### General Things
 
 **Sunday, March 13th, 1:30am**
 
@@ -207,6 +207,6 @@ Now code will clean up after itself, closing file descriptors, sockets and
 everything. Also, it will cancel the threads after a timeout. Currently
 the timeout is set to 300 seconds.
 
-# Benchmarking
+## Benchmarking
 
 To be done...
