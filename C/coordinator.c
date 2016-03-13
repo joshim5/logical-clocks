@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
 	}
 
 	/* Sleep for 5 minutes */
-	sleep(10);
+	sleep(5 * 60);
 
 	printf("Woke up. Cancelling threads...\n");
 
