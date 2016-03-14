@@ -5,6 +5,7 @@
 #include <strings.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <assert.h>
 
 #include <threads.h>
 #include <log.h>
@@ -37,6 +38,12 @@ int pre_init_machine(int ticks, int id) {
 	int err = pthread_mutex_init(&machines[id].queue_lock, NULL);
 	if (err) {
 		perror("pthread_mutex_init");
+		exit(1);
+	}
+
+	err = pthread_cond_init(&machines[id].queue_cv, NULL);
+	if (err) {
+		perror("pthread_cond_init");
 		exit(1);
 	}
 
@@ -73,7 +80,7 @@ void *client_routine(void *arg) {
 
 			servaddr.sin_family = AF_INET;
 			servaddr.sin_port = htons(server->port);
-			inet_pton(AF_INET, "localhost", &servaddr.sin_addr);
+			inet_pton(AF_INET, "localhost", &servaddr); 
 
 			/* This may not work, since the other machine may
 			 * not have started its server yet. In that case,
@@ -112,11 +119,22 @@ void *client_routine(void *arg) {
 			pthread_mutex_lock(&mach->queue_lock);
 		
 			unsigned size = queue_size(mach->queue);
+			unsigned capacity = queue_capacity(mach->queue);
+			
+			if (size == capacity)
+				pthread_cond_broadcast(&mach->queue_cv);
 			
 			if (size > 0) {
 				/* Dequeue a message */
 				unsigned received = queue_dequeue(mach->queue);
 				
+				/* Notice that size > 0 and we have a lock;
+				 * so this should not fail */
+				if (received == -1) {
+					perror("queue_dequeue");
+					exit(1);
+				}
+
 				/* Logical clock logic for receiving message */
 				unsigned max = mach->lclock;
 				if (received > mach->lclock) 
@@ -126,7 +144,7 @@ void *client_routine(void *arg) {
 				
 				/* Write appropriate log */
 				write_to_log(RECV_MSG_LOG, received, mach->lclock, size, mach->log);
-				
+			
 				pthread_mutex_unlock(&mach->queue_lock);
 
 				continue;
@@ -137,9 +155,9 @@ void *client_routine(void *arg) {
 			/* Otherwise, we pick a random number, and act 
 			 * according to the specification */
 
-			int which = random_int(1, 10);		
-			unsigned message = mach->lclock;
-			
+			int which = random_int(1, 5);		
+			unsigned message = mach->lclock;	
+
 			switch(which) {
 				case 1:
 					/* Send message to one machine */
@@ -215,7 +233,6 @@ void *client_routine(void *arg) {
 void *server_routine(void *arg) {
 	struct machine *mach = (struct machine *) arg;
 	struct server *server = &mach->server;
-	char buffer[BUF_SIZE];
 
 	/* Set of file descriptors to select on */
 	fd_set readfds;
@@ -243,8 +260,8 @@ void *server_routine(void *arg) {
 
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(server->port);
-	inet_pton(AF_INET, "localhost", &servaddr.sin_addr);
-	
+	servaddr.sin_addr.s_addr = INADDR_ANY;
+
 	/* Bind server to port */
 	int err = bind(server->master_socket, (struct sockaddr *) &servaddr, 
 		sizeof(servaddr));
@@ -259,17 +276,29 @@ void *server_routine(void *arg) {
 
 	printf("Server: Server %d running\n", mach->id);
 	
-	while (1) {		
+	while (1) {
+		struct timeval tv;
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+
 		/* Select on sockets to see if there is either a new 
-		 * connection, or a new message */
-		int r = select(max_fd + 1, &readfds, NULL, NULL, NULL);
+		 connection, or a new message. Times out for half a second.
+		 This is just to let all the connections happen. */ 
+		int r = select(max_fd + 1, &readfds, NULL, NULL, &tv);
 
 		if (r < 0 && errno != EINTR) {
 			printf("Server: select: error on select\n");
 			return NULL;
 		}
 
-		/* New connection */
+		/* New message; loop through all the connections to check */
+		err = receive_messages(mach, &readfds);
+		if (err) {
+			perror("receive_messages");
+			exit(1);
+		}
+
+		/* Check for new connections */
 		if (FD_ISSET(server->master_socket, &readfds)) {
 			/* Accept the new connection and do bookkeeping
 			 * for select */
@@ -277,12 +306,11 @@ void *server_routine(void *arg) {
 			int fd = accept(server->master_socket, NULL, NULL);
 
 			if (fd < 0) {
-				printf("Server: accept: error on accept\n");
 				perror("accept");
 				return NULL;
 			}
 
-			printf("Server: New connection\n");
+			printf("Server: New connection %d\n", fd);
 
 			for (int i = 0; i < THREADS; i++) {
 				if (server->connections[i] == 0) {
@@ -298,56 +326,144 @@ void *server_routine(void *arg) {
 
 			continue;
 		}
+	}
+}
 
-		/* New message; loop through all the connections to check */
-		for (int i = 0; i < THREADS; i++) {
-			int fd = server->connections[i];
+/* Receives all messages for a given machine. Keeps looping. */
+int receive_messages(struct machine *mach, fd_set *readfds) {
+	struct server *server = &mach->server;
+	
+	for (int i = 0; i < THREADS - 1; i++) {
+		int fd = server->connections[i];
+	
+		if (FD_ISSET(fd, readfds)) {
+			struct server *server = &mach->server;
+			unsigned bytes;
+			char buf[BUF_SIZE];
 		
-			if (FD_ISSET(fd, &readfds)) {
-				int nread = read(fd, buffer, BUF_SIZE);
-				
-				/* This should not happen, since we are using
-				 * select */
-				if (nread == -1) {
-					perror("read");
-					exit(1);
+			/* Check if there is anything really to read in
+			 * this file descriptor. */
+			bytes = recv(fd, &buf, BUF_SIZE, MSG_PEEK);
+			
+			/* Loop while there are bytes to read */
+			while (bytes > 0) {
+				uint32_t buffer = 0;
+				unsigned curlen = 0;
+				unsigned length = sizeof(uint32_t);
+
+				/* Assumes we first get 4 bytes defining
+				 * the length of the rest of the message.
+				 * This will always be 4 bytes in this case. */
+				while (curlen < length) {
+					int nread = recv(fd, ((char *) &buffer) + curlen, length - curlen, 0);
+					if (nread == -1) {
+						if (errno == EAGAIN)
+							continue;
+
+						perror("recv");
+						return -1;
+					}
+
+					if (nread == 0) {
+						printf("Server: Socket %d disconnected\n", fd);
+						server->connections[i] = 0;
+						close(fd);
+
+						break;
+					}
+
+					curlen += nread;
 				}
 
-				/* If no bytes were received, the connection
-				 * was lost */
-				if (nread == 0) {
-					printf("Server: Socket %d disconnected!\n", fd);
-					server->connections[i] = 0;
-					close(fd);
-					
-					break;
+				/* The length is the buffer read, so now
+				 * we fetch that amount of bytes. */
+				length = htonl(buffer);
+
+				curlen = 0;
+				while (curlen < length) {
+					int nread = recv(fd, ((char *) &buffer) + curlen, length - curlen, 0);
+					if (nread == -1) {
+						if (errno == EAGAIN)
+							continue;
+
+						perror("recv");
+						return -1;
+					}
+
+					if (nread == 0) {
+						printf("Server: Socket %d disconnected\n", fd);
+						server->connections[i] = 0;
+						close(fd);
+
+						break;
+					}
+
+					curlen += nread;
 				}
-				
-				/* Must nul-terminate strings */
-				buffer[nread] = '\0';
-				
-				/* Assuming messages are always unsigned ints */
-				unsigned received = strtoul(buffer, NULL, 10);
+					
+				/* The buffer here is simply a uint32_t again */
+				unsigned received = ntohl(buffer); 
 
 				/* Acquire queue lock, and enqueue message */
 				pthread_mutex_lock(&mach->queue_lock);
-				queue_enqueue(mach->queue, received);
+
+				unsigned size = queue_size(mach->queue);
+				unsigned capacity = queue_capacity(mach->queue);
+
+				while (size >= capacity)
+					pthread_cond_wait(&mach->queue_cv, &mach->queue_lock);
+
+				/* We waited on a condition variable that
+				 * should guarantee that the queue is not full.
+				 * So, this should not fail. */
+				int err = queue_enqueue(mach->queue, received);
+				if (err) {
+					perror("queue_enqueue");
+					return -1;
+				}
+
 				pthread_mutex_unlock(&mach->queue_lock);
 
-				break;
-			}
+				/* Check again if there are new messages
+				 * in this fd */
+				bytes = recv(fd, &buf, 1, MSG_PEEK);
+			} 
 		}
 	}
+
+	return 0;
 }
 
 /* Sends a message to destination containing the value of the lclock. */
 int send_message(int dest, unsigned lclock) {
-	char buffer[BUF_SIZE];
-	sprintf(buffer, "%d", lclock);
-	return write(dest, buffer, strlen(buffer) + 1);
+	uint32_t message[2];
+
+	message[0] = htonl(4);
+	message[1] = htonl(lclock);
+
+	int nwritten = -1;
+
+	fd_set writefds;
+	FD_ZERO(&writefds);
+	FD_SET(dest, &writefds);
+
+	int r = select(dest + 1, NULL, &writefds, NULL, NULL);
+	if (r == -1) {
+		perror("select");
+		return -1;
+	}
+
+	nwritten = send(dest, message, 2 * sizeof(uint32_t), 0);
+
+	/* We are selecting so this should not happen */
+	if (nwritten == -1) {
+		perror("send_message");
+		return -1;
+	}
+
+	return 0;
 }
 
 /* Handles an internal event. */
 void internal_event(void) {
-	usleep(1000);	
 }

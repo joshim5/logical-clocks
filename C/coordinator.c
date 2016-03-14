@@ -5,9 +5,11 @@
 #include <random.h>
 #include <threads.h>
 #include <time.h>
+#include <sys/time.h>
 
 #define THREADS_MAX 10
 
+struct timeval start;
 pthread_t threads[THREADS_MAX];
 
 int main(int argc, char** argv) {

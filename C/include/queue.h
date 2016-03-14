@@ -14,4 +14,6 @@ unsigned queue_dequeue(struct queue *q);
 
 unsigned queue_size(struct queue *q);
 
+unsigned queue_capacity(struct queue *q);
+
 struct queue *queue_create(unsigned capacity);

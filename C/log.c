@@ -14,8 +14,6 @@ void write_to_log(int type, unsigned message, unsigned lclock,
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-	char buffer[LOGBUF_SIZE];
-
 	switch(type) {
 		case RECV_MSG_LOG:
 			fprintf(log,

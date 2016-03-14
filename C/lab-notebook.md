@@ -217,6 +217,34 @@ Now code will clean up after itself, closing file descriptors, sockets and
 everything. Also, it will cancel the threads after a timeout. Currently
 the timeout is set to 300 seconds.
 
+**Sunday, March 14th, 11pm**
+
+Changed some structure of the code, made `recv` more robust. It was assuming
+that it was going to receive all messages at once. Now it does not. Also
+changed some things with `select`.
+
 ## Benchmarking
 
-To be done...
+It seems like the queue never gets VERY big. On tests where we changed the
+number of ticks to something much higher, we did get bigger queues
+(around 20). However, for smaller number of ticks for each machine,
+the queue was pretty much stable around 1 and 2.
+
+We noticed that some of the messages that were trying to be sent were
+not truly arriving at their destination. We could not exactly find out why,
+since `send` is not returning any errors, and most messages do get received.
+Perhaps it was something in the network.
+
+In general, the jumps were not that high either, possibly due to this issue
+with some messages being dropped. The jumps seemed to be pretty small when
+the number of ticks was lower.
+
+When the internal event probability is lower, then jumps were obviously smaller
+but more frequent (since more messages would be sent, so a slow machine
+would update its logical clock to 'catch up' with the other ones more often,
+even if the machine itself is slow).
+
+We also made internal events take longer by sleeping, but this did not affect
+the results.
+
+Anyway, this was fun!
