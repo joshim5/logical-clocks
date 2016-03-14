@@ -1,15 +1,5 @@
 # logical-clocks
 We are building models of asynchronous distributed systems to experiment on multiple implementations of logical clocks.
 
-## Dependencies and Installation
-
-This application runs on Python 2.7 and has the following dependencies:
-
-* 
-
-It has been tested on Ubuntu 14.04 (running on VMWare) and on Mac OS X El Capitan.
-Support is likely on other systems, but installation may be slightly more cumbersome.
-
-## Usage
-
-## Design Structure
+## Design Process
+To understand our design decisions and follow our progress, please check our lab notebooks. We have two lab notebooks - one in the Python folder and one in the C folder. Temporally, the Python lab notebook was written before the C lab notebook.

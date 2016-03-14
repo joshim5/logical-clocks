@@ -45,3 +45,10 @@ message = "Started VM {0} at system time {1}\n\n".format(self.msgq_self_id, self
     self.log(message)
 ```
 
+### Analyzing preliminary results
+Indeed, this is working properly. The initial time printed is the same across VMs. So have therefore enabled true parallelism. The results are unsurprising, too. There is a delay (in terms of system clock time) between sending and receiving across processes that have different logical tick times.
+
+## Requirement of network sockets
+We found [this post](https://canvas.harvard.edu/courses/9563/discussion_topics/104698) on Canvas. Prof. Waldo says not to use global structs (which are not really doing - yay!). However, the Python multiprocessing library, as far as we understand, spawns/forks a separate process for each thread. Which is not putting the entire model machine in a single process, which is the assignment. Furthermore, the assignment seems to require network sockets, which he have not enabled.
+
+In order to ensure that we have done this correctly, we have decided to push forward on the C implementation. There, we are running everything within the same process. In any case, one could argue that C is better suited for this assignment. As we have experienced several times already, Python abstracts too much without telling you, and that can lead to problems. When designing distributed systems, it is better to use lower-level languages so that logical flaws do not arise in the future.
